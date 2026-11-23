@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Answer Review</title>
+<style>
+  :root {
+    --page: #fafafa;
+    --card: #ffffff;
+    --ink: #1a1a1a;
+    --ink-2: #5c5c5c;
+    --hairline: #e3e3e3;
+    --warn-bg: #fff7e6;
+    --warn-border: #f0d9a8;
+    --note-bg: #eef5ff;
+    --note-border: #c3d9f5;
+    --accent: #1a1a1a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 24px 16px 64px;
+  }
+  .card { max-width: 720px; margin: 0 auto; background: var(--card); border: 1px solid var(--hairline); border-radius: 12px; padding: 28px 24px 32px; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  h2 { font-size: 17px; margin: 0 0 10px; }
+  .fact-line { color: var(--ink-2); font-size: 14px; margin: 0 0 12px; }
+  .intro { color: var(--ink-2); margin: 0 0 20px; }
+  .group { border-top: 1px solid var(--hairline); padding: 20px 0 4px; margin-top: 20px; }
+  .group:first-of-type { border-top: 0; margin-top: 0; padding-top: 0; }
+  .group-label { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); margin: 0 0 6px; }
+  label { display: block; font-size: 14px; color: var(--ink-2); margin: 12px 0 4px; }
+  input[type="text"], textarea {
+    width: 100%; border: 1px solid var(--hairline); border-radius: 6px; padding: 10px 12px;
+    font: inherit; color: var(--ink); background: var(--page);
+  }
+  textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; resize: vertical; }
+  button {
+    font: inherit; border-radius: 6px; border: 1px solid var(--accent); padding: 9px 16px;
+    background: var(--accent); color: #fff; cursor: pointer; margin-top: 12px;
+  }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  button.ghost { background: transparent; color: var(--ink); border-color: var(--hairline); }
+  button.secondary { background: transparent; color: var(--ink); border-color: var(--ink); }
+  .caption { font-size: 13px; color: var(--ink-2); margin: 6px 0 0; }
+  .callout { border-radius: 8px; padding: 12px 14px; margin: 10px 0; font-size: 14.5px; }
+  .callout.warn { background: var(--warn-bg); border: 1px solid var(--warn-border); }
+  .callout.note { background: var(--note-bg); border: 1px solid var(--note-border); }
+  .callout .callout-title { font-weight: 600; display: block; margin-bottom: 2px; }
+  ul { margin: 8px 0; padding-left: 22px; }
+  li { margin: 4px 0; }
+  .facts { display: flex; gap: 32px; flex-wrap: wrap; margin: 8px 0; }
+  .facts .fact .k { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); }
+  .facts .fact .v { font-weight: 600; }
+  .dim { border-top: 1px solid var(--hairline); padding: 12px 0 14px; }
+  .dim-name { font-weight: 600; }
+  .dim-desc { color: var(--ink-2); font-size: 13.5px; margin: 2px 0 0; }
+  .choices { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .choices .choice {
+    border: 1px solid var(--hairline); border-radius: 999px; padding: 5px 14px; font-size: 14px;
+    background: transparent; color: var(--ink); cursor: pointer; margin-top: 0;
+  }
+  .choices .choice.selected { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .closing { margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--hairline); color: var(--ink-2); font-size: 13.5px; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <!-- Stage: paste -->
+  <div id="stage-paste">
+    <h1>AI Answer Review</h1>
+    <p class="fact-line">Free. Nothing uploaded.</p>
+    <p class="intro">Paste the prompt you gave an AI and the answer it gave back. Get a checklist of things worth a human look, then record your own review. The tool points; you judge. Nothing you type leaves this page.</p>
+
+    <div class="group">
+      <p class="group-label">Step 1</p>
+      <h2>Paste the exchange</h2>
+      <label for="task-name">Task name (optional)</label>
+      <input type="text" id="task-name">
+      <label for="prompt-paste">The prompt</label>
+      <textarea id="prompt-paste" rows="6" placeholder="Paste exactly what you asked the AI"></textarea>
+      <label for="answer-paste">The AI's answer</label>
+      <textarea id="answer-paste" rows="10" placeholder="Paste the answer you received"></textarea>
+      <button id="btn-analyse" disabled>Review this answer</button>
+      <p class="caption hidden" id="paste-hint">Paste both the prompt and the answer first (a little more text is needed).</p>
+    </div>
+
+    <div class="group" id="honesty-paste"></div>
+    <p class="closing">Pasted text is held only in this page while it is open. Reviewing another answer clears it.</p>
+  </div>
+
+  <!-- Stage: review -->
+  <div id="stage-review" class="hidden">
+    <h1 id="review-title">AI Answer Review</h1>
+    <p class="fact-line" id="review-count"></p>
+    <p class="intro">Each flag below is a reason to look closer, not a verdict. Heuristics miss things and cry wolf sometimes; that is why the review record is yours, not the tool's.</p>
+
+    <div class="group">
+      <p class="group-label">The exchange at a glance</p>
+      <div class="facts">
+        <div class="fact"><div class="k">Prompt</div><div class="v" id="fact-prompt"></div></div>
+        <div class="fact"><div class="k">Answer</div><div class="v" id="fact-answer"></div></div>
+        <div class="fact"><div class="k">Flags</div><div class="v" id="fact-flags"></div></div>
+      </div>
+    </div>
+
+    <div class="group" id="flags-group">
+      <p class="group-label">Worth a human look</p>
+      <div id="flags-list"></div>
+      <p class="caption" id="flags-none" class="hidden">No heuristic flags. That means these particular checks found nothing, not that the answer is correct. Accuracy is still on the reviewer.</p>
+    </div>
+
+    <div class="group">
+      <p class="group-label">Step 2: your review</p>
+      <div id="dim-list"></div>
+    </div>
+
+    <div class="group">
+      <p class="group-label">Step 3: your record</p>
+      <p id="record-empty">Mark at least one dimension above and your record appears here.</p>
+      <div id="record-body" class="hidden">
+        <div id="record-groups"></div>
+        <p class="caption" id="record-unmarked"></p>
+        <p class="caption">No total, no score, no verdict. Ship-or-revise is the reviewer's call.</p>
+        <button class="secondary" id="btn-copy">Copy this record</button>
+        <p class="caption hidden" id="copy-done">Copied.</p>
+      </div>
+    </div>
+
+    <button class="ghost" id="btn-reset">Review another answer</button>
+
+    <div class="group" id="honesty-review"></div>
+    <p class="closing">Pasted text and marks are held only in this page while it is open. Nothing is saved or sent.</p>
+  </div>
+
+</div>
+
+<script>
+// ===PARSE-BEGIN===
+function wordCount(text) {
+    const m = text.trim().match(/\S+/g);
+    return m ? m.length : 0;
+}
+
+function reviewExchange(promptText, answerText) {
+    const flags = [];
+    const p = promptText;
+    const a = answerText;
+
+    // 1. Format requests in the prompt vs the answer's shape.
+    const asksBullets = /(bullet|bulleted|list of|\blist\b|points)/i.test(p) && !/no bullets|prose only|paragraph/i.test(p);
+    if (asksBullets) {
+        const hasBullets = /^[\s]*([-*•]|\d+[\.\)])\s+\S/m.test(a);
+        if (!hasBullets) flags.push({ title: 'Format: list requested', body: 'The prompt asks for a list or bullet points, but the answer has no bullet or numbered lines. Check whether the format instruction was ignored.' });
+    }
+    const asksTable = /\btable\b/i.test(p);
+    if (asksTable && !/\|/.test(a) && !/<table/i.test(a)) {
+        flags.push({ title: 'Format: table requested', body: 'The prompt asks for a table, but the answer shows no table structure. Check whether the format instruction was ignored.' });
+    }
+    const wm = p.match(/(\d{2,4})\s*(?:\+?\s*)words?\b/i) || p.match(/(?:in|under|within|max(?:imum)?|about|around)\s+(\d{2,4})\s+words/i);
+    if (wm) {
+        const target = parseInt(wm[1], 10);
+        const actual = wordCount(a);
+        if (Math.abs(actual - target) > Math.max(20, target * 0.25)) {
+            flags.push({ title: 'Length: word count off', body: 'The prompt asks for about ' + target + ' words; the answer is about ' + actual + '. Counts are approximate, but this gap is large enough to check.' });
+        }
+    }
+    if (/\bemail\b/i.test(p) && !/^(dear|hi|hello|hey)\b/im.test(a.trim())) {
+        flags.push({ title: 'Format: email requested', body: 'The prompt asks for an email, but the answer does not start like one (no greeting line). Check whether it ignored the format or wrapped the email in commentary.' });
+    }
+    if (/\bjson\b/i.test(p)) {
+        const t = a.trim();
+        if (!(t.startsWith('{') || t.startsWith('[') || /```\s*(json)?/i.test(t))) {
+            flags.push({ title: 'Format: JSON requested', body: 'The prompt asks for JSON, but the answer does not appear to be JSON or a JSON code block. Check before using it programmatically.' });
+        }
+    }
+
+    // 2. Statistics and strong claims without a source.
+    const statLines = a.split(/\r?\n/).filter((l) => /(\d+(\.\d+)?\s?%|\$\s?\d|₹\s?\d|\b\d+(\.\d+)?\s?(million|billion|crore|lakh|x)\b)/i.test(l));
+    const sourced = /(source|according to (a )?(report|study|survey|paper)|\[\d+\]|https?:\/\/|census|annual report)/i.test(a);
+    if (statLines.length > 0 && !sourced) {
+        flags.push({ title: 'Numbers without a source', body: 'The answer states figures (' + statLines.length + ' line' + (statLines.length > 1 ? 's' : '') + ' with percentages or amounts) but names no source. If any number will be reused, verify it against a real source first.' });
+    }
+    const claimHits = a.match(/\b(always|never|guaranteed|guarantees|proven to|undoubtedly|it is a fact that|no risk)\b/gi);
+    if (claimHits && claimHits.length >= 2) {
+        flags.push({ title: 'Absolute claims', body: 'The answer leans on absolute wording (' + claimHits.slice(0, 4).join(', ') + '). Check each such claim is one you can stand behind, or soften it.' });
+    }
+
+    // 3. Citation-shaped text that may be invented.
+    const citeHits = a.match(/(\[\d+\]|\bet al\.\b|according to (a )?(study|studies|research|researchers)|\(19\d\d|20\d\d\))/g);
+    if (citeHits && citeHits.length > 0) {
+        flags.push({ title: 'Citation-shaped text', body: 'The answer contains what looks like citations or studies (' + citeHits.slice(0, 3).join(', ') + '). Before citing any of them, confirm each reference exists and says what the answer implies.' });
+    }
+
+    // 4. Invented first-person experience.
+    if (/\b(in my experience|i have (used|tried|tested|worked with)|when i (used|tried|worked)|personally, i)\b/i.test(a)) {
+        flags.push({ title: 'First-person experience claims', body: 'The answer speaks in first person ("in my experience", "I have tried"). Fine if this is your own draft voice or a quoted passage; worth rewording if it will read as the AI claiming real experience.' });
+    }
+
+    // 5. Multiple questions in the prompt vs a short answer.
+    const qCount = (p.match(/\?/g) || []).length;
+    if (qCount >= 2) {
+        const paras = a.split(/\n\s*\n/).filter((x) => x.trim().length > 0).length;
+        if (wordCount(a) < qCount * 20) {
+            flags.push({ title: 'Coverage: multiple questions', body: 'The prompt asks ' + qCount + ' questions and the answer is brief (' + paras + ' block' + (paras === 1 ? '' : 's') + '). Short can still be complete; check each question got its own answer.' });
+        }
+    }
+
+    // 6. Advice domains that usually need a caveat.
+    if (/\b(medical|health|symptom|dosage|medicine|legal|lawyer|contract|sue|tax|invest|stock|crypto|loan|diagnos)\w*/i.test(p)) {
+        if (!/\b(consult|professional|doctor|lawyer|advisor|not (medical|legal|financial) advice|qualified)\b/i.test(a)) {
+            flags.push({ title: 'Advice domain, no caveat', body: 'The prompt touches a medical, legal or financial topic and the answer gives no professional caveat. Depending on how the answer will be used, a qualifier or professional review may be worth adding.' });
+        }
+    }
+
+    return { flags, promptWords: wordCount(p), answerWords: wordCount(a) };
+}
+// ===PARSE-END===
+
+(function () {
+    const $ = (id) => document.getElementById(id);
+    const DIMS = [
+        { key: 'instructions', name: 'Instructions followed', desc: 'Did it do what was actually asked, including format and constraints?' },
+        { key: 'accuracy', name: 'Accuracy, as far as you can verify', desc: 'Check the facts, numbers and names you can check. Mark what you could not verify in your note.' },
+        { key: 'completeness', name: 'Completeness', desc: 'Did it cover every part of the request, or skip the hard bits?' },
+        { key: 'tone', name: 'Tone and wording', desc: 'Does it sound like something you would actually send or publish?' },
+        { key: 'safety', name: 'Safe to use', desc: 'Anything private, offensive, copied, or risky in how it would be used?' }
+    ];
+    const CHOICES = [['ok', 'Holds up'], ['flag', 'Needs a fix'], ['miss', 'Failed']];
+    let result = null;
+    let marks = {};
+    let notes = {};
+
+    const promptEl = $('prompt-paste');
+    const answerEl = $('answer-paste');
+    const btn = $('btn-analyse');
+
+    function ready() {
+        return promptEl.value.trim().length >= 20 && answerEl.value.trim().length >= 40;
+    }
+    function onInput() {
+        btn.disabled = !ready();
+        const some = promptEl.value.trim().length > 0 || answerEl.value.trim().length > 0;
+        $('paste-hint').classList.toggle('hidden', !(some && !ready()));
+    }
+    promptEl.addEventListener('input', onInput);
+    answerEl.addEventListener('input', onInput);
+
+    btn.addEventListener('click', () => {
+        result = reviewExchange(promptEl.value, answerEl.value);
+        marks = {};
+        notes = {};
+        $('stage-paste').classList.add('hidden');
+        $('stage-review').classList.remove('hidden');
+        renderReview();
+        window.scrollTo(0, 0);
+    });
+
+    $('btn-reset').addEventListener('click', () => {
+        $('stage-review').classList.add('hidden');
+        $('stage-paste').classList.remove('hidden');
+        promptEl.value = ''; answerEl.value = ''; $('task-name').value = '';
+        btn.disabled = true;
+        $('paste-hint').classList.add('hidden');
+        result = null; marks = {}; notes = {};
+        window.scrollTo(0, 0);
+    });
+
+    $('btn-copy').addEventListener('click', () => {
+        const text = recordText();
+        const done = () => {
+            $('copy-done').classList.remove('hidden');
+            setTimeout(() => $('copy-done').classList.add('hidden'), 2000);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(done, () => legacyCopy(text, done));
+        } else {
+            legacyCopy(text, done);
+        }
+    });
+
+    function legacyCopy(text, done) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); done(); } catch (e) {}
+        document.body.removeChild(ta);
+    }
+
+    function el(tag, className, text) {
+        const e = document.createElement(tag);
+        if (className) e.className = className;
+        if (text !== undefined) e.textContent = text;
+        return e;
+    }
+
+    function renderReview() {
+        $('review-title').textContent = $('task-name').value.trim() || 'AI Answer Review';
+        $('review-count').textContent = result.flags.length + ' flag' + (result.flags.length === 1 ? '' : 's') + ' from heuristic checks';
+        $('fact-prompt').textContent = result.promptWords + ' words';
+        $('fact-answer').textContent = result.answerWords + ' words';
+        $('fact-flags').textContent = String(result.flags.length);
+
+        const fl = $('flags-list');
+        fl.innerHTML = '';
+        result.flags.forEach((f) => {
+            const c = el('div', 'callout warn');
+            c.appendChild(el('span', 'callout-title', f.title));
+            c.appendChild(document.createTextNode(f.body));
+            fl.appendChild(c);
+        });
+        $('flags-none').classList.toggle('hidden', result.flags.length > 0);
+        if (result.flags.length === 0) {
+            const c = el('div', 'callout note');
+            c.appendChild(el('span', 'callout-title', 'No heuristic flags'));
+            c.appendChild(document.createTextNode('These particular checks found nothing. That is not the same as the answer being correct; accuracy is still on the reviewer.'));
+            fl.appendChild(c);
+            $('flags-none').classList.add('hidden');
+        }
+
+        renderDims();
+        renderRecord();
+        renderHonesty($('honesty-review'));
+    }
+
+    function renderDims() {
+        const list = $('dim-list');
+        list.innerHTML = '';
+        DIMS.forEach((d) => {
+            const row = el('div', 'dim');
+            row.appendChild(el('div', 'dim-name', d.name));
+            row.appendChild(el('p', 'dim-desc', d.desc));
+            const choices = el('div', 'choices');
+            CHOICES.forEach(([key, label]) => {
+                const b = el('button', 'choice' + (marks[d.key] === key ? ' selected' : ''), label);
+                b.addEventListener('click', () => {
+                    if (marks[d.key] === key) delete marks[d.key];
+                    else marks[d.key] = key;
+                    renderDims();
+                    renderRecord();
+                });
+                choices.appendChild(b);
+            });
+            row.appendChild(choices);
+            if (marks[d.key] === 'flag' || marks[d.key] === 'miss') {
+                const nl = el('label', null, 'Your note (optional)');
+                nl.setAttribute('for', 'note-' + d.key);
+                row.appendChild(nl);
+                const input = el('input');
+                input.type = 'text';
+                input.id = 'note-' + d.key;
+                input.value = notes[d.key] || '';
+                input.addEventListener('input', () => { notes[d.key] = input.value; });
+                row.appendChild(input);
+            }
+            list.appendChild(row);
+        });
+    }
+
+    function renderRecord() {
+        const marked = DIMS.filter((d) => marks[d.key]);
+        const unmarked = DIMS.length - marked.length;
+        $('record-empty').classList.toggle('hidden', marked.length > 0);
+        $('record-body').classList.toggle('hidden', marked.length === 0);
+        if (!marked.length) return;
+        const groups = $('record-groups');
+        groups.innerHTML = '';
+        CHOICES.forEach(([key, label]) => {
+            const rows = DIMS.filter((d) => marks[d.key] === key);
+            if (!rows.length) return;
+            const g = el('div', 'group');
+            g.appendChild(el('p', 'group-label', label + ' (' + rows.length + ')'));
+            const ul = el('ul');
+            rows.forEach((d) => ul.appendChild(el('li', null, d.name + (notes[d.key] ? ' -- ' + notes[d.key] : ''))));
+            g.appendChild(ul);
+            groups.appendChild(g);
+        });
+        $('record-unmarked').textContent = unmarked > 0 ? unmarked + ' dimension' + (unmarked === 1 ? '' : 's') + ' unmarked.' : '';
+    }
+
+    function recordText() {
+        const linesOut = [];
+        linesOut.push('AI Answer Review record');
+        linesOut.push('Task: ' + ($('task-name').value.trim() || 'untitled'));
+        linesOut.push('Prompt ' + result.promptWords + ' words, answer ' + result.answerWords + ' words, ' + result.flags.length + ' heuristic flag' + (result.flags.length === 1 ? '' : 's') + '.');
+        if (result.flags.length) {
+            linesOut.push('');
+            linesOut.push('Flags raised');
+            result.flags.forEach((f) => linesOut.push('- ' + f.title));
+        }
+        CHOICES.forEach(([key, label]) => {
+            const rows = DIMS.filter((d) => marks[d.key] === key);
+            if (!rows.length) return;
+            linesOut.push('');
+            linesOut.push(label + ' (' + rows.length + ')');
+            rows.forEach((d) => linesOut.push('- ' + d.name + (notes[d.key] ? ' -- ' + notes[d.key] : '')));
+        });
+        linesOut.push('');
+        linesOut.push('Marked by the human reviewer, in their own words. This record gives no score and no ship-or-revise verdict.');
+        return linesOut.join('\n');
+    }
+
+    function renderHonesty(mount) {
+        mount.innerHTML = '';
+        mount.appendChild(el('p', 'group-label', 'Honesty'));
+        mount.appendChild(el('h2', null, 'What this tool does not do'));
+        const ul = el('ul');
+        [
+            'It does not check facts. Flags are places to look, and the accuracy call stays with the reviewer.',
+            'Heuristics miss real problems and occasionally flag fine answers. An answer with zero flags is not a good answer by default.',
+            'It makes no claim about which AI model wrote the answer or how any model scores quality internally.',
+            'It never totals your marks and never says whether to ship or revise.',
+            'The tool sends nothing you type anywhere. What you paste is processed on your device and disappears when you leave.'
+        ].forEach((t) => ul.appendChild(el('li', null, t)));
+        mount.appendChild(ul);
+    }
+
+    renderHonesty($('honesty-paste'));
+})();
+</script>
+</body>
+</html>
