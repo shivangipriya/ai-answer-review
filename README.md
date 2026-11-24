@@ -2,6 +2,8 @@
 
 Paste the prompt you gave an AI and the answer it gave back. Get a checklist of things worth a human look, then record your own review. The tool points; you judge.
 
+**Try it:** https://shivangipriya.github.io/ai-answer-review/ - runs in your browser, no signup.
+
 ## Why this exists
 
 AI answers often get reused after only a skim. This tool gives an answer a structured once-over before reuse: it points at things worth a human look, and turns the reviewer's own judgement into a record they can keep.
